@@ -14,7 +14,7 @@ test('Login failed', async ({ page }) => {
 
   await loginPage.goto();
   await loginPage.loginForm.login(process.env.USERNAME as string, 'wrong_password');
-  expect (await loginPage.loginForm.getErrors()).toBe('Username and password do not match any user.');
+  expect ((await loginPage.loginForm.getErrors()).trim()).toBe('Username and password do not match any user.');
 
 });
 
