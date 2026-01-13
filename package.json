@@ -1,14 +1,14 @@
 {
-  "name": "predavanje8",
+  "name": "Playwright Test Framework - Postanitester.rs",
   "version": "1.0.0",
   "main": "index.js",
   "scripts": {
     "test": "playwright test"
   },
-  "keywords": [],
-  "author": "",
+  "keywords": ["playwright", "typescript", "testing", "automation"],
+  "author": "Nenad Cvetkovic - Postanitester.rs",
   "license": "ISC",
-  "description": "",
+  "description": "One example of testing framework developed in Typescript with Playwright for Postanitester.rs advanced Playwright course.",
   "devDependencies": {
     "@playwright/test": "^1.57.0",
     "@types/node": "^25.0.3",
