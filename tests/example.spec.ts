@@ -9,13 +9,11 @@ import { CheckoutCompletePage } from '../pages/CheckoutCompletePage';
 
 
 
-
-
 test('Login failed', async ({ page }) => {
   const loginPage = new LoginPage(page);
 
   await loginPage.goto();
-  await loginPage.loginForm.login('Postani_tester', 'Postanitester123');
+  await loginPage.loginForm.login(process.env.USERNAME as string, 'wrong_password');
   expect (await loginPage.loginForm.getErrors()).toBe('Username and password do not match any user.');
 
 });
@@ -25,7 +23,7 @@ test('Login', async ({ page }) => {
 
 
   await loginPage.goto();
-  await loginPage.loginForm.login('postani_tester', 'postanitester123');
+  await loginPage.loginForm.login(process.env.USERNAME as string, process.env.PASSWORD as string);
 
   const inventoryPage = new InventoryPage(page);
 
@@ -38,7 +36,7 @@ test('Add to cart by index', async ({ page }) => {
 
 
   await loginPage.goto();
-  await loginPage.loginForm.login('postani_tester', 'postanitester123');
+  await loginPage.loginForm.login(process.env.USERNAME as string, process.env.PASSWORD as string);
 
   const inventoryPage = new InventoryPage(page);
 
@@ -58,7 +56,7 @@ test('Checkout', async ({ page }) => {
 
 
   await loginPage.goto();
-  await loginPage.loginForm.login('postani_tester', 'postanitester123');
+  await loginPage.loginForm.login(process.env.USERNAME as string, process.env.PASSWORD as string);
 
   const inventoryPage = new InventoryPage(page);
 
@@ -91,12 +89,12 @@ test('Filter products', async ({ page }) => {
 
 
   await loginPage.goto();
-  await loginPage.loginForm.login('postani_tester', 'postanitester123');
+  await loginPage.loginForm.login(process.env.USERNAME as string, process.env.PASSWORD as string);
 
   const inventoryPage = new InventoryPage(page);
 
   expect(await inventoryPage.header.isLogoVisible()).toBeTruthy();
-  
+
   await inventoryPage.products.filterByPrice({minPrice: 35, maxPrice: 50});
 
   expect(await inventoryPage.products.getProductsCount()).toBe(4);
