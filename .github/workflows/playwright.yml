@@ -13,8 +13,8 @@ jobs:
     timeout-minutes: 15
     env:
       BASE_URL: ${{ vars.BASE_URL }}
-      USER_EMAIL: ${{ secrets.USER_EMAIL }}
-      USER_PASSWORD: ${{ secrets.USER_PASSWORD }}
+      USERNAME: ${{ secrets.USERNAME }}
+      PASSWORD: ${{ secrets.PASSWORD }}
 
     steps:
       - name: Checkout
