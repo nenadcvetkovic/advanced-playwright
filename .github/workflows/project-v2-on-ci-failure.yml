@@ -39,7 +39,6 @@ jobs:
             if (!owner) throw new Error("Missing variable PROJECT_OWNER.");
             if (!projectNumber) throw new Error("Missing/invalid variable PROJECT_NUMBER.");
 
-            const octokit = github.getOctokit(token);
 
             const run = context.payload.workflow_run;
             const repoOwner = context.repo.owner;
