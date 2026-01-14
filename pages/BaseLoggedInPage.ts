@@ -9,9 +9,7 @@ export abstract class BaseLoggedInPage {
     public footer : FooterComponent;
 
     constructor (protected readonly page : Page){
-
          this.header = new HeaderComponent(this.page.locator('header.container'));
          this.footer = new FooterComponent(this.page.getByTestId("footer"));
-
     }
 }
