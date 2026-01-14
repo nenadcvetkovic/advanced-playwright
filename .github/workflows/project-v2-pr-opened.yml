@@ -1,0 +1,151 @@
+name: Project v2 - PR Opened -> Add + Set Status
+
+on:
+  pull_request:
+    types: [opened, reopened, ready_for_review]
+
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  add_pr_to_project:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Add PR to Project and set Status
+        uses: actions/github-script@v7
+        env:
+          GH_TOKEN: ${{ secrets.PROJECTS_TOKEN }}
+          PROJECT_OWNER: ${{ vars.PROJECT_OWNER }}
+          PROJECT_NUMBER: ${{ vars.PROJECT_NUMBER }}
+          STATUS_FIELD_NAME: ${{ vars.PROJECT_STATUS_FIELD }}
+          STATUS_VALUE: ${{ vars.STATUS_PR_OPENED }}
+        with:
+          script: |
+            // =========================
+            // CONFIG (course-friendly)
+            // =========================
+            const token = process.env.GH_TOKEN;
+            const owner = process.env.PROJECT_OWNER;            // user login
+            const projectNumber = Number(process.env.PROJECT_NUMBER);
+            const statusFieldName = process.env.STATUS_FIELD_NAME || "Status";
+            const statusValue = process.env.STATUS_VALUE || "In Review";
+
+            // =========================
+            // VALIDATION
+            // =========================
+            if (!token) throw new Error("Missing secret PROJECTS_TOKEN.");
+            if (!owner) throw new Error("Missing variable PROJECT_OWNER (your GitHub username).");
+            if (!projectNumber) throw new Error("Missing/invalid variable PROJECT_NUMBER (e.g. 7).");
+
+            const octokit = github.getOctokit(token);
+            const pr = context.payload.pull_request;
+            const prNodeId = pr.node_id;
+
+            // =========================
+            // HELPERS
+            // =========================
+            async function getProjectAndStatusOption() {
+              const query = `
+                query($owner: String!, $number: Int!) {
+                  user(login: $owner) {
+                    projectV2(number: $number) {
+                      id
+                      title
+                      fields(first: 50) {
+                        nodes {
+                          ... on ProjectV2SingleSelectField {
+                            id
+                            name
+                            options { id name }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }`;
+
+              const data = await octokit.graphql(query, { owner, number: projectNumber });
+              const project = data.user?.projectV2;
+
+              if (!project) {
+                throw new Error(`User Project v2 not found for owner="${owner}", number=${projectNumber}.`);
+              }
+
+              const statusField = project.fields.nodes.find(f => f?.name === statusFieldName);
+              if (!statusField) {
+                throw new Error(`Field "${statusFieldName}" not found. Check PROJECT_STATUS_FIELD variable.`);
+              }
+
+              const option = statusField.options.find(o => o.name === statusValue);
+              if (!option) {
+                const available = statusField.options.map(o => o.name).join(", ");
+                throw new Error(`Option "${statusValue}" not found in "${statusFieldName}". Available: ${available}`);
+              }
+
+              return { projectId: project.id, projectTitle: project.title, fieldId: statusField.id, optionId: option.id };
+            }
+
+            async function addToProject(projectId, contentId) {
+              const mutation = `
+                mutation($projectId: ID!, $contentId: ID!) {
+                  addProjectV2ItemById(input: { projectId: $projectId, contentId: $contentId }) {
+                    item { id }
+                  }
+                }`;
+              const res = await octokit.graphql(mutation, { projectId, contentId });
+              return res.addProjectV2ItemById.item.id;
+            }
+
+            async function setSingleSelect(projectId, itemId, fieldId, optionId) {
+              const mutation = `
+                mutation($projectId: ID!, $itemId: ID!, $fieldId: ID!, $optionId: String!) {
+                  updateProjectV2ItemFieldValue(input: {
+                    projectId: $projectId
+                    itemId: $itemId
+                    fieldId: $fieldId
+                    value: { singleSelectOptionId: $optionId }
+                  }) { projectV2Item { id } }
+                }`;
+              await octokit.graphql(mutation, { projectId, itemId, fieldId, optionId });
+            }
+
+            async function findItemForPR(projectId, prNumber) {
+              // Course version: scans first 100 items (good enough for teaching)
+              const query = `
+                query($projectId: ID!) {
+                  node(id: $projectId) {
+                    ... on ProjectV2 {
+                      items(first: 100) {
+                        nodes {
+                          id
+                          content { ... on PullRequest { number } }
+                        }
+                      }
+                    }
+                  }
+                }`;
+              const data = await octokit.graphql(query, { projectId });
+              const items = data.node.items.nodes || [];
+              const match = items.find(it => it.content?.number === prNumber);
+              return match?.id;
+            }
+
+            // =========================
+            // MAIN
+            // =========================
+            const { projectId, projectTitle, fieldId, optionId } = await getProjectAndStatusOption();
+
+            let itemId;
+            try {
+              itemId = await addToProject(projectId, prNodeId);
+              core.info(`Added PR #${pr.number} to "${projectTitle}" (itemId=${itemId})`);
+            } catch (e) {
+              core.warning(`Could not add PR (maybe already exists). Attempting to find existing item...`);
+              itemId = await findItemForPR(projectId, pr.number);
+              if (!itemId) throw new Error(`PR #${pr.number} not found in first 100 project items. (Increase pagination for large projects.)`);
+              core.info(`Found existing item for PR #${pr.number} (itemId=${itemId})`);
+            }
+
+            await setSingleSelect(projectId, itemId, fieldId, optionId);
+            core.info(`✅ Set ${statusFieldName}="${statusValue}" for PR #${pr.number}`);

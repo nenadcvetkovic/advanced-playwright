@@ -1,0 +1,141 @@
+name: Project v2 - CI Failed -> Create Issue + Add + Set Status
+
+on:
+  workflow_run:
+    workflows: ["Playwright Tests"]
+    types: [completed]
+
+permissions:
+  contents: read
+  actions: read
+  issues: write
+
+jobs:
+  on_failure:
+    if: ${{ github.event.workflow_run.conclusion == 'failure' }}
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Create Issue, add to Project, set Status
+        uses: actions/github-script@v7
+        env:
+          GH_TOKEN: ${{ secrets.PROJECTS_TOKEN }}
+          PROJECT_OWNER: ${{ vars.PROJECT_OWNER }}
+          PROJECT_NUMBER: ${{ vars.PROJECT_NUMBER }}
+          STATUS_FIELD_NAME: ${{ vars.PROJECT_STATUS_FIELD }}
+          STATUS_VALUE: ${{ vars.STATUS_CI_FAILED }}
+        with:
+          script: |
+            // =========================
+            // CONFIG
+            // =========================
+            const token = process.env.GH_TOKEN;
+            const owner = process.env.PROJECT_OWNER;
+            const projectNumber = Number(process.env.PROJECT_NUMBER);
+            const statusFieldName = process.env.STATUS_FIELD_NAME || "Status";
+            const statusValue = process.env.STATUS_VALUE || "Blocked";
+
+            if (!token) throw new Error("Missing secret PROJECTS_TOKEN.");
+            if (!owner) throw new Error("Missing variable PROJECT_OWNER.");
+            if (!projectNumber) throw new Error("Missing/invalid variable PROJECT_NUMBER.");
+
+            const octokit = github.getOctokit(token);
+
+            const run = context.payload.workflow_run;
+            const repoOwner = context.repo.owner;
+            const repo = context.repo.repo;
+
+            // 1) Create Issue
+            const title = `🚨 CI Failure: ${run.name} (#${run.run_number})`;
+            const body = [
+              `**Workflow:** ${run.name}`,
+              `**Run:** #${run.run_number}`,
+              `**Branch:** ${run.head_branch}`,
+              `**Commit:** ${run.head_sha}`,
+              `**Run URL:** ${run.html_url}`,
+              ``,
+              `### What to do`,
+              `- Open the run and inspect logs`,
+              `- Download Playwright artifacts (HTML report, traces/videos)`,
+              `- Fix, then re-run the workflow`
+            ].join("\n");
+
+            const issueRes = await octokit.rest.issues.create({
+              owner: repoOwner,
+              repo,
+              title,
+              body,
+              labels: ["ci", "test-failure"]
+            });
+
+            const issueNodeId = issueRes.data.node_id;
+            core.info(`✅ Created issue: ${issueRes.data.html_url}`);
+
+            // 2) Load Project + status option
+            async function getProjectAndStatusOption() {
+              const query = `
+                query($owner: String!, $number: Int!) {
+                  user(login: $owner) {
+                    projectV2(number: $number) {
+                      id
+                      title
+                      fields(first: 50) {
+                        nodes {
+                          ... on ProjectV2SingleSelectField {
+                            id
+                            name
+                            options { id name }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }`;
+
+              const data = await octokit.graphql(query, { owner, number: projectNumber });
+              const project = data.user?.projectV2;
+              if (!project) throw new Error(`User Project v2 not found for owner="${owner}", number=${projectNumber}.`);
+
+              const statusField = project.fields.nodes.find(f => f?.name === statusFieldName);
+              if (!statusField) throw new Error(`Field "${statusFieldName}" not found.`);
+
+              const option = statusField.options.find(o => o.name === statusValue);
+              if (!option) {
+                const available = statusField.options.map(o => o.name).join(", ");
+                throw new Error(`Option "${statusValue}" not found. Available: ${available}`);
+              }
+
+              return { projectId: project.id, projectTitle: project.title, fieldId: statusField.id, optionId: option.id };
+            }
+
+            async function addToProject(projectId, contentId) {
+              const mutation = `
+                mutation($projectId: ID!, $contentId: ID!) {
+                  addProjectV2ItemById(input: { projectId: $projectId, contentId: $contentId }) {
+                    item { id }
+                  }
+                }`;
+              const res = await octokit.graphql(mutation, { projectId, contentId });
+              return res.addProjectV2ItemById.item.id;
+            }
+
+            async function setSingleSelect(projectId, itemId, fieldId, optionId) {
+              const mutation = `
+                mutation($projectId: ID!, $itemId: ID!, $fieldId: ID!, $optionId: String!) {
+                  updateProjectV2ItemFieldValue(input: {
+                    projectId: $projectId
+                    itemId: $itemId
+                    fieldId: $fieldId
+                    value: { singleSelectOptionId: $optionId }
+                  }) { projectV2Item { id } }
+                }`;
+              await octokit.graphql(mutation, { projectId, itemId, fieldId, optionId });
+            }
+
+            // 3) Add Issue to project + set status
+            const { projectId, projectTitle, fieldId, optionId } = await getProjectAndStatusOption();
+            const itemId = await addToProject(projectId, issueNodeId);
+
+            await setSingleSelect(projectId, itemId, fieldId, optionId);
+
+            core.info(`✅ Added issue to "${projectTitle}" and set ${statusFieldName}="${statusValue}"`);
