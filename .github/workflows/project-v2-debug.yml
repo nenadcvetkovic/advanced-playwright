@@ -13,7 +13,6 @@ jobs:
           PROJECT_NUMBER: ${{ vars.PROJECT_NUMBER }}
         with:
           script: |
-            // const octokit = github.getOctokit(process.env.GH_TOKEN);
             const owner = process.env.PROJECT_OWNER;
             const number = Number(process.env.PROJECT_NUMBER);
 
