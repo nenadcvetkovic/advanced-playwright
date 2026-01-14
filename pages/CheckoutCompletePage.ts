@@ -1,19 +1,14 @@
 import { Page } from "@playwright/test"
-import { HeaderComponent } from "../components/HeaderComponent";
+import { BaseLoggedInPage } from "./BaseLoggedInPage";
 
-export class CheckoutCompletePage {
+export class CheckoutCompletePage extends BaseLoggedInPage {
 
-    public header: HeaderComponent
-
-
-    constructor(private readonly page: Page) {
-        this.header = new HeaderComponent(this.page.locator('header.container'));
+    constructor(protected readonly page: Page) {
+      super(page);
     }
 
     async getMessage(): Promise<string> {
-
         return await this.page.locator('[data-testid="page.checkout.complete"] p').textContent() as string;
-
     }
 
 }
