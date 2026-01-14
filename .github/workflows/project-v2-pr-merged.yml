@@ -28,7 +28,8 @@ jobs:
             // =========================
             // CONFIG
             // =========================
-            // const token = process.env.GH_TOKEN;
+            const token = process.env.GH_TOKEN;
+
             const owner = process.env.PROJECT_OWNER;
             const projectNumber = Number(process.env.PROJECT_NUMBER);
             const statusFieldName = process.env.STATUS_FIELD_NAME || "Status";

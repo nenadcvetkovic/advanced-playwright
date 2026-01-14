@@ -23,18 +23,3 @@ jobs:
             core.info(JSON.stringify(res, null, 2));
 
 
-      # - uses: actions/github-script@v7
-      #   env:
-      #     GH_TOKEN: ${{ secrets.PROJECTS_TOKEN }}
-      #     PROJECT_OWNER: ${{ vars.PROJECT_OWNER }}
-      #     PROJECT_NUMBER: ${{ vars.PROJECT_NUMBER }}
-      #   with:
-      #     script: |
-      #       const owner = process.env.PROJECT_OWNER;
-      #       const number = Number(process.env.PROJECT_NUMBER);
-
-      #       const q = `query($owner:String!, $number:Int!) {
-      #         user(login:$owner) { projectV2(number:$number) { id title } }
-      #       }`;
-      #       const res = await octokit.graphql(q, { owner, number });
-      #       core.info(JSON.stringify(res, null, 2));
