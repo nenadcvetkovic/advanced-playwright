@@ -21,11 +21,13 @@ jobs:
           STATUS_FIELD_NAME: ${{ vars.PROJECT_STATUS_FIELD }}
           STATUS_VALUE: ${{ vars.STATUS_PR_OPENED }}
         with:
+          github-token: ${{ secrets.PROJECTS_TOKEN }}
           script: |
             // =========================
             // CONFIG (course-friendly)
             // =========================
-            const token = process.env.GH_TOKEN;
+            // const token = process.env.GH_TOKEN;
+
             const owner = process.env.PROJECT_OWNER;            // user login
             const projectNumber = Number(process.env.PROJECT_NUMBER);
             const statusFieldName = process.env.STATUS_FIELD_NAME || "Status";
@@ -64,7 +66,7 @@ jobs:
                   }
                 }`;
 
-              const data = await octokit.graphql(query, { owner, number: projectNumber });
+              const data = await github.graphql(query, { owner, number: projectNumber });
               const project = data.user?.projectV2;
 
               if (!project) {
@@ -92,7 +94,7 @@ jobs:
                     item { id }
                   }
                 }`;
-              const res = await octokit.graphql(mutation, { projectId, contentId });
+              const res = await github.graphql(mutation, { projectId, contentId });
               return res.addProjectV2ItemById.item.id;
             }
 
@@ -106,7 +108,7 @@ jobs:
                     value: { singleSelectOptionId: $optionId }
                   }) { projectV2Item { id } }
                 }`;
-              await octokit.graphql(mutation, { projectId, itemId, fieldId, optionId });
+              await github.graphql(mutation, { projectId, itemId, fieldId, optionId });
             }
 
             async function findItemForPR(projectId, prNumber) {
@@ -124,7 +126,7 @@ jobs:
                     }
                   }
                 }`;
-              const data = await octokit.graphql(query, { projectId });
+              const data = await github.graphql(query, { projectId });
               const items = data.node.items.nodes || [];
               const match = items.find(it => it.content?.number === prNumber);
               return match?.id;

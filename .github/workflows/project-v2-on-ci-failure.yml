@@ -25,11 +25,13 @@ jobs:
           STATUS_FIELD_NAME: ${{ vars.PROJECT_STATUS_FIELD }}
           STATUS_VALUE: ${{ vars.STATUS_CI_FAILED }}
         with:
+          github-token: ${{ secrets.PROJECTS_TOKEN }}
           script: |
             // =========================
             // CONFIG
             // =========================
-            const token = process.env.GH_TOKEN;
+            // const token = process.env.GH_TOKEN;
+
             const owner = process.env.PROJECT_OWNER;
             const projectNumber = Number(process.env.PROJECT_NUMBER);
             const statusFieldName = process.env.STATUS_FIELD_NAME || "Status";
@@ -91,7 +93,7 @@ jobs:
                   }
                 }`;
 
-              const data = await octokit.graphql(query, { owner, number: projectNumber });
+              const data = await github.graphql(query, { owner, number: projectNumber });
               const project = data.user?.projectV2;
               if (!project) throw new Error(`User Project v2 not found for owner="${owner}", number=${projectNumber}.`);
 
@@ -114,7 +116,7 @@ jobs:
                     item { id }
                   }
                 }`;
-              const res = await octokit.graphql(mutation, { projectId, contentId });
+              const res = await github.graphql(mutation, { projectId, contentId });
               return res.addProjectV2ItemById.item.id;
             }
 
@@ -128,7 +130,7 @@ jobs:
                     value: { singleSelectOptionId: $optionId }
                   }) { projectV2Item { id } }
                 }`;
-              await octokit.graphql(mutation, { projectId, itemId, fieldId, optionId });
+              await github.graphql(mutation, { projectId, itemId, fieldId, optionId });
             }
 
             // 3) Add Issue to project + set status
